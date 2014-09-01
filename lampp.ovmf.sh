@@ -19,7 +19,7 @@
 #docker rm `docker ps -notrunc -a -q` > /dev/null 2>&1
 #docker ps -a
 
-docker build -t data-store - <<DATASTORE
+docker build -t data-store - << DATASTORE
 ######## data-store
 FROM ubuntu:14.04
 MAINTAINER Frank Lemanschik <frank@dspeed.eu>
@@ -46,7 +46,7 @@ VOLUME ["/data"]
 CMD /bin/sh
 DATASTORE
 
-docker build -t site-db - <<SITEDB
+docker build -t site-db - <<'SITEDB'
 # MariaDB (https://mariadb.org/)
 FROM ubuntu:14.04
 MAINTAINER Martin Gondermann magicmonty@pagansoft.de
@@ -54,10 +54,9 @@ ENV DOCKER_RUN docker run -d -volumes-from my-data-store -name my-site-db site-d
 # Set noninteractive mode for apt-get
 ENV DEBIAN_FRONTEND noninteractive
 
-RUN echo "deb http://archive.ubuntu.com/ubuntu precise main universe" > /etc/apt/sources.list && \
-	apt-get update && \
-	apt-get upgrade -y && \
-	apt-get -y -q install wget logrotate
+RUN apt-get update \
+ && apt-get upgrade -y \
+ &&	apt-get -y -q install wget logrotate
 
 # Ensure UTF-8
 RUN apt-get update
@@ -66,11 +65,8 @@ ENV LANG en_US.UTF-8
 ENV LC_ALL en_US.UTF-8
 
 # Install MariaDB from repository.
-RUN apt-get -y install python-software-properties && \
-	apt-key adv --recv-keys --keyserver hkp://keyserver.ubuntu.com:80 0xcbcb082a1bb943db && \
-	add-apt-repository 'deb http://mirror.jmu.edu/pub/mariadb/repo/5.5/ubuntu precise main' && \
-	apt-get update && \
-	apt-get install -y mariadb-server
+RUN	apt-get update && \
+	apt-get install -y mysql-server
 
 # Decouple our data from our container.
 VOLUME ["/data"]
@@ -84,10 +80,10 @@ EXPOSE 3306
 #ADD site-db/start.sh /start.sh
 RUN echo '#!/bin/bash \n\
 \n\
-# Starts up MariaDB within the container.
+# Starts up MariaDB within the container. \n\
 \n\
-# Stop on error
-set -e
+# Stop on error \n\
+set -e \n\
 \n\
 DATADIR="/data/mysql" \n\
 \n\
@@ -131,18 +127,17 @@ SITEDB
 
 
 docker build -t web-machine - <<WEB
-FROM ubuntu:precise
-MAINTAINER magicmonty@pagansoft.de
+FROM dockerimages/ubuntu-core:14.04
+MAINTAINER Frank Lemanschik
 
 # Install all that’s needed
-ENV DEBIAN_FRONTEND noninteractive
-RUN echo "deb http://archive.ubuntu.com/ubuntu precise main universe" > /etc/apt/sources.list && \
-	apt-get update && \
-	apt-get -y upgrade && \
-	apt-get -y install mysql-client apache2 libapache2-mod-php5 pwgen python-setuptools vim-tiny php5-mysql openssh-server sudo php5-ldap unzip && \
-	apt-get clean && \
-	rm -rf /var/lib/apt/lists/*
-RUN easy_install supervisor
+RUN apt-get update \
+ &&	apt-get -y upgrade \
+ && apt-get -y install \
+ 	mysql-client apache2 libapache2-mod-php5 pwgen python-setuptools vim-tiny php5-mysql openssh-server sudo php5-ldap unzip \
+ && apt-get clean \
+ &&	rm -rf /var/lib/apt/lists/* \
+ && easy_install supervisor
 
 # Create! --Add-- all config and start files
 RUN echo "#!/bin/bash \n\
@@ -150,8 +145,7 @@ RUN echo "#!/bin/bash \n\
 chown -R www-data:www-data /data/www \n\
 supervisord -n" > /start.sh
 
-
-RUN echo "# /etc/supervisord.conf \n\
+RUN echo '# /etc/supervisord.conf \n\
 [unix_http_server] \n\
 file=/tmp/supervisor.sock                       ; path to your socket file \n\
 \n\
@@ -182,12 +176,12 @@ stopsignal=6 \n\
 command=/usr/sbin/sshd -D \n\
 stdout_logfile=/var/log/supervisord/%(program_name)s.log \n\
 stderr_logfile=/var/log/supervisord/%(program_name)s.log \n\
-autorestart=true" > /etc/supervisord.conf
- && echo"#!/bin/bash \n\
+autorestart=true' > /etc/supervisord.conf \
+ && echo '#!/bin/bash \n\
 read pid cmd state ppid pgrp session tty_nr tpgid rest < /proc/self/stat \n\
 trap "kill -TERM -$pgrp; exit" EXIT TERM KILL SIGKILL SIGTERM SIGQUIT \n\
 source /etc/apache2/envvars \n\
-apache2 -D FOREGROUND" > /etc/apache2/foreground.sh
+apache2 -D FOREGROUND' > /etc/apache2/foreground.sh
 
 RUN mkdir -p /var/log/supervisord /var/run/sshd
 RUN chmod 755 /start.sh && chmod 755 /etc/apache2/foreground.sh
@@ -197,6 +191,7 @@ ENV APACHE_RUN_USER www-data
 ENV APACHE_RUN_GROUP www-data
 ENV APACHE_LOG_DIR /var/log/apache2
 ENV DOCKER_RUN "docker run -d -name my-web-machine -p 80:80 -p 9000:22 -link my-site-db:mysql -volumes-from my-data-store web-machine"
+ENV HAPROXY_DOMAIN "joomla3"
 VOLUME ["/data"]
 
 # Add site to apache
@@ -218,7 +213,10 @@ ErrorLog ${APACHE_LOG_DIR}/error.log \n\
 # alert, emerg. \n\
 LogLevel warn \n\
 CustomLog ${APACHE_LOG_DIR}/access.log combined \n\
-</VirtualHost>" > /etc/apache2/sites-available/joomla
+</VirtualHost>" > /etc/apache2/sites-available/joomla.conf
+
+#RUN ls -ao /etc/apache2/sites-available/ && cat /etc/apache2/sites-available/joomla
+
 
 RUN a2ensite joomla
 RUN a2dissite 000-default
