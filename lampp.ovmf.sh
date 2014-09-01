@@ -21,55 +21,49 @@
 
 docker build -t data-store - << DATASTORE
 ######## data-store
-FROM ubuntu:14.04
+FROM dockerimages/ubuntu-core:14.04
 MAINTAINER Frank Lemanschik <frank@dspeed.eu>
-# OLD MAINTAINER Martin Gondermann magicmonty@pagansoft.de
 ENV DOCKER_RUN docker run -name my-data-store data-store true
-RUN DEBIAN_FRONTEND="noninteractive" && \
-	echo "deb http://archive.ubuntu.com/ubuntu trusty main universe" >> /etc/apt/sources.list && \
-	apt-get update && \
-	apt-get -y upgrade && \
-	apt-get -y install curl unzip && \
-	apt-get clean && \
-	rm -rf /var/lib/apt/lists/*
-
-# Create data directories
-RUN mkdir -p /data/mysql /data/www
-
-RUN curl -G -o /data/joomla.zip http://joomlacode.org/gf/download/frsrelease/19239/158104/Joomla_3.2.3-Stable-Full_Package.zip && \
-	unzip /data/joomla.zip -d /data/www && \
-	rm /data/joomla.zip
+RUN apt-get update \
+ && apt-get -y upgrade \
+ && apt-get -y install curl unzip \
+ && apt-get clean \
+ && rm -rf /var/lib/apt/lists/*
 
 # Create /data volume
 VOLUME ["/data"]
 
-CMD /bin/sh
+# Create data directories
+RUN mkdir -p /data/mysql /data/www
+
+# Fill it With Joomla
+RUN curl -G -o /data/joomla.zip http://joomlacode.org/gf/download/frsrelease/19239/158104/Joomla_3.2.3-Stable-Full_Package.zip \
+ && unzip /data/joomla.zip -d /data/www \
+ && rm /data/joomla.zip
+CMD ["/bin/sh" "echo" "done"]
 DATASTORE
 
 docker build -t site-db - <<'SITEDB'
-# MariaDB (https://mariadb.org/)
-FROM ubuntu:14.04
-MAINTAINER Martin Gondermann magicmonty@pagansoft.de
+FROM dockerimages/ubuntu-core:14.04
+MAINTAINER Frank Lemanschik
 ENV DOCKER_RUN docker run -d -volumes-from my-data-store -name my-site-db site-db
-# Set noninteractive mode for apt-get
-ENV DEBIAN_FRONTEND noninteractive
 
 RUN apt-get update \
  && apt-get upgrade -y \
  &&	apt-get -y -q install wget logrotate
 
 # Ensure UTF-8
-RUN apt-get update
-RUN locale-gen en_US.UTF-8
+RUN apt-get update \
+ && locale-gen en_US.UTF-8
 ENV LANG en_US.UTF-8
 ENV LC_ALL en_US.UTF-8
 
-# Install MariaDB from repository.
-RUN	apt-get update && \
-	apt-get install -y mysql-server
+# Install Mysql
+RUN apt-get update \
+ && apt-get install -y mysql-server
 
 # Decouple our data from our container.
-VOLUME ["/data"]
+#VOLUME ["/data"]
 
 # Configure the database to use our data dir.
 RUN sed -i -e 's/^datadir\s*=.*/datadir = \/data\/mysql/' /etc/mysql/my.cnf
