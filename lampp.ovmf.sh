@@ -19,7 +19,7 @@
 #docker rm `docker ps -notrunc -a -q` > /dev/null 2>&1
 #docker ps -a
 
-docker build -t data-store - << DATASTORE
+docker build -t data-store - <<DATASTORE
 ######## data-store
 FROM ubuntu:14.04
 MAINTAINER Frank Lemanschik <frank@dspeed.eu>
@@ -46,7 +46,7 @@ VOLUME ["/data"]
 CMD /bin/sh
 DATASTORE
 
-docker build -t site-db - << SITEDB
+docker build -t site-db - <<SITEDB
 # MariaDB (https://mariadb.org/)
 FROM ubuntu:14.04
 MAINTAINER Martin Gondermann magicmonty@pagansoft.de
@@ -130,7 +130,7 @@ ENTRYPOINT ["/start.sh"]
 SITEDB
 
 
-docker build -t web-machine - << WEB
+docker build -t web-machine - <<WEB
 FROM ubuntu:precise
 MAINTAINER magicmonty@pagansoft.de
 
